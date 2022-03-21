@@ -237,6 +237,7 @@ open class SyntaxTextView: _View {
         #if os(iOS)
 
         textView.autocapitalizationType = .none
+        textView.smartDashesType = .no
         textView.keyboardType = .default
         textView.autocorrectionType = .no
         textView.spellCheckingType = .no
