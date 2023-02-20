@@ -365,6 +365,39 @@ extension SyntaxTextView {
 
 			return false
 		}
+
+        if origInsertingText == "(" {
+
+            textStorage.replaceCharacters(in: selectedRange, with: "()")
+
+            didUpdateText()
+
+            updateSelectedRange(NSRange(location: selectedRange.lowerBound + 1, length: 0))
+
+            return false
+        }
+
+        if origInsertingText == "{" {
+
+            textStorage.replaceCharacters(in: selectedRange, with: "{}")
+
+            didUpdateText()
+
+            updateSelectedRange(NSRange(location: selectedRange.lowerBound + 1, length: 0))
+
+            return false
+        }
+
+        if origInsertingText == "[" {
+
+            textStorage.replaceCharacters(in: selectedRange, with: "[]")
+
+            didUpdateText()
+
+            updateSelectedRange(NSRange(location: selectedRange.lowerBound + 1, length: 0))
+
+            return false
+        }
 		
 		return true
 	}
