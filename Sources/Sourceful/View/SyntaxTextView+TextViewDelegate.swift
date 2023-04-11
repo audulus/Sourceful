@@ -244,6 +244,10 @@ extension SyntaxTextView {
         } ?? []
     }
 
+    static func rangeInString(range: NSRange, string: NSString) -> Bool {
+        range.lowerBound >= 0 && range.upperBound <= string.length
+    }
+
 	func shouldChangeText(insertingText: String) -> Bool {
 
 		let selectedRange = textView.selectedRange
@@ -395,6 +399,28 @@ extension SyntaxTextView {
             updateSelectedRange(NSRange(location: selectedRange.lowerBound + 1, length: 0))
 
             return false
+        }
+
+        if origInsertingText == "" {
+            let nsText = textView.text as NSString
+            let pos = selectedRange.location
+            let range = NSRange(location: pos-1, length: 2)
+
+            if Self.rangeInString(range: range, string: nsText) {
+
+                let substr = nsText.substring(with: range)
+
+                if substr == "()" || substr == "{}" || substr == "[]" {
+
+                    textStorage.replaceCharacters(in: range, with: "")
+
+                    didUpdateText()
+
+                    updateSelectedRange(NSRange(location: pos-1, length: 0))
+
+                    return false
+                }
+            }
         }
 		
 		return true
