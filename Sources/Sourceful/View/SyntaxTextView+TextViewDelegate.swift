@@ -232,6 +232,18 @@ extension SyntaxTextView {
 
 extension SyntaxTextView {
 
+    /// Do we have any placeholders to go to?
+    var textContainsPlaceholders: Bool {
+        cachedTokens?.contains { $0.token.isEditorPlaceholder } ?? false
+    }
+
+    /// List of placeholder tokens.
+    var placeholders: [CachedToken] {
+        cachedTokens?.filter {
+            $0.token.isEditorPlaceholder
+        } ?? []
+    }
+
 	func shouldChangeText(insertingText: String) -> Bool {
 
 		let selectedRange = textView.selectedRange
@@ -285,75 +297,61 @@ extension SyntaxTextView {
 		guard let cachedTokens = cachedTokens else {
 			return true
 		}
-			
-		for token in cachedTokens {
-			
-			let range = token.nsRange
-			
-			if token.token.isEditorPlaceholder {
-				
-				// Allow editorPlaceholder to be completely deleted.
-				if insertingText == "", selectedRange.lowerBound == range.upperBound {
-					textStorage.replaceCharacters(in: range, with: insertingText)
-					
-					didUpdateText()
-					
-					updateSelectedRange(NSRange(location: range.lowerBound, length: 0))
 
-					return false
-				}
+        if origInsertingText != "\t" {
 
-				if isEditorPlaceholderSelected(selectedRange: selectedRange, tokenRange: range) {
-					
-					if insertingText == "\t" {
-						
-						let placeholderTokens = cachedTokens.filter({
-							$0.token.isEditorPlaceholder
-						})
-						
-						guard placeholderTokens.count > 1 else {
-							return false
-						}
-						
-						let nextPlaceholderToken = placeholderTokens.first(where: {
-							
-							let nsRange = $0.nsRange
-							
-							return nsRange.lowerBound > range.lowerBound
-							
-						})
-						
-						if let tokenToSelect = nextPlaceholderToken ?? placeholderTokens.first {
-							
-							updateSelectedRange(NSRange(location: tokenToSelect.nsRange.lowerBound + 1, length: 0))
-							
-							return false
-							
-						}
-						
-						return false
-					}
-					
-					if selectedRange.location <= range.location || selectedRange.upperBound >= range.upperBound {
-						// Editor placeholder is part of larger selected text,
-						// so allow system inserting.
-						return true
-					}
-					
-//					(textView.undoManager?.prepare(withInvocationTarget: self) as? TextView).replace
-					
-					textStorage.replaceCharacters(in: range, with: insertingText)
-					
-					didUpdateText()
-					
-					updateSelectedRange(NSRange(location: range.lowerBound + insertingText.count, length: 0))
+            // If we are inserting text within a placeholder, replace the whole placeholder.
+            for placeholder in placeholders {
 
-					return false
-				}
-				
-			}
-			
-		}
+                let range = placeholder.nsRange
+
+                if isEditorPlaceholderSelected(selectedRange: selectedRange, tokenRange: range) {
+
+                    if selectedRange.location <= range.location || selectedRange.upperBound >= range.upperBound {
+                        // Editor placeholder is part of larger selected text,
+                        // so allow system inserting.
+                        return true
+                    }
+
+                    textStorage.replaceCharacters(in: range, with: insertingText)
+
+                    didUpdateText()
+
+                    updateSelectedRange(NSRange(location: range.lowerBound + insertingText.count, length: 0))
+
+                    return false
+
+                }
+            }
+        }
+
+        if origInsertingText == "\t" {
+
+            if textContainsPlaceholders {
+
+                let range = selectedRange
+
+                // Select the next placeholder.
+                let placeholderTokens = cachedTokens.filter({
+                    $0.token.isEditorPlaceholder
+                })
+
+                let nextPlaceholderToken = placeholderTokens.first {
+                    let nsRange = $0.nsRange
+                    return nsRange.lowerBound > range.lowerBound
+                }
+
+                if let tokenToSelect = nextPlaceholderToken ?? placeholderTokens.first {
+                    updateSelectedRange(NSRange(location: tokenToSelect.nsRange.lowerBound + 1, length: 0))
+                }
+
+                // Don't insert anything.
+                return false
+
+            } else {
+                return true
+            }
+        }
 		
 		if origInsertingText == "\n" {
 
