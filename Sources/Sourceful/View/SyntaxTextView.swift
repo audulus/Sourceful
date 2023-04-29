@@ -299,8 +299,8 @@ open class SyntaxTextView: _View {
             }
             #else
             // If the user sets this property as soon as they create the view, we get a strange UIKit bug where the text often misses a final line in some Dynamic Type configurations. The text isn't actually missing: if you background the app then foreground it the text reappears just fine, so there's some sort of drawing sync problem. A simple fix for this is to give UIKit a tiny bit of time to create all its data before we trigger the update, so we push the updating work to the runloop.
-            DispatchQueue.main.async {
-                if self.textView.text != newValue {
+            if textView.text != newValue {
+                DispatchQueue.main.async {
                     self.textView.text = newValue
                     self.textView.setNeedsDisplay()
                     self.refreshColors()
