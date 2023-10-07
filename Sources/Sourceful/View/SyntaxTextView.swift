@@ -156,6 +156,7 @@ open class SyntaxTextView: _View {
         #if os(macOS)
 
         wrapperView.translatesAutoresizingMaskIntoConstraints = false
+        wrapperView.clipsToBounds = true
 
         scrollView.backgroundColor = .clear
         scrollView.drawsBackground = false
