@@ -66,18 +66,9 @@ import Foundation
 			
 				let yOffset = self.bounds.height - contentHeight
 			
-				var paragraphs: [Paragraph]
-			
-				if let cached = textView.cachedParagraphs {
-					
-					paragraphs = cached
-					
-				} else {
-					
-					paragraphs = generateParagraphs(for: textView, flipRects: true)
-					textView.cachedParagraphs = paragraphs
-					
-				}
+				// Cached paragraphs are in the (flipped) text view's space;
+				// this view is not flipped, so mirror them for drawing.
+				var paragraphs = flipParagraphs(textView.paragraphs(), for: textView)
 			
 				paragraphs = offsetParagraphs(paragraphs, for: textView, yOffset: yOffset)
 			

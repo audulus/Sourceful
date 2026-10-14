@@ -97,18 +97,20 @@ func generateParagraphs(for textView: InnerTextView, flipRects: Bool = false) ->
 	
 	
 	if flipRects {
-		
-		paragraphs = paragraphs.map { (p) -> Paragraph in
-			
-			var p = p
-			p.rect.origin.y = textView.bounds.height - p.rect.height - p.rect.origin.y
-			
-			return p
-		}
-		
+		paragraphs = flipParagraphs(paragraphs, for: textView)
 	}
 	
 	return paragraphs
+}
+
+/// Mirrors paragraph rects vertically, for drawing in a non-flipped view
+/// the same height as the text view. Applying it twice gives the original.
+func flipParagraphs(_ paragraphs: [Paragraph], for textView: InnerTextView) -> [Paragraph] {
+	return paragraphs.map { (p) -> Paragraph in
+		var p = p
+		p.rect.origin.y = textView.bounds.height - p.rect.height - p.rect.origin.y
+		return p
+	}
 }
 
 func offsetParagraphs(_ paragraphs: [Paragraph], for textView: InnerTextView, yOffset: CGFloat = 0) -> [Paragraph] {
@@ -148,19 +150,42 @@ func drawLineNumbers(_ paragraphs: [Paragraph], in rect: CGRect, for textView: I
 	guard let style = textView.theme?.lineNumbersStyle else {
 		return
 	}
+
+	// Right edge of the text area, so the diagnostic tint stops short of
+	// the scroller instead of painting over it.
+	#if os(macOS)
+	var textMaxX = textView.enclosingScrollView?.contentView.frame.maxX ?? textView.bounds.width
+	if let scroller = textView.enclosingScrollView?.verticalScroller, !scroller.isHidden {
+		textMaxX = min(textMaxX, scroller.frame.minX)
+	}
+	#else
+	let textMaxX = textView.bounds.width
+	#endif
 	
 	for paragraph in paragraphs {
-		
+
 		guard paragraph.rect.intersects(rect) else {
 			continue
 		}
-		
+
 		let attr = paragraph.attributedString(for: style)
-		
+
 		var drawRect = paragraph.rect
-		
+
 		let gutterWidth = textView.gutterWidth
-		
+
+		if textView.diagnosticsByLine[paragraph.number] != nil {
+
+			// Mark the gutter cell, and lightly tint the line itself.
+			let cell = CGRect(x: 0, y: paragraph.rect.minY, width: gutterWidth, height: paragraph.rect.height)
+			textView.diagnosticColor.withAlphaComponent(0.8).setFill()
+			BezierPath(rect: cell).fill()
+
+			let band = CGRect(x: gutterWidth, y: cell.minY, width: max(0, textMaxX - gutterWidth), height: cell.height)
+			textView.diagnosticColor.withAlphaComponent(0.12).setFill()
+			BezierPath(rect: band).fill()
+		}
+
 		let drawSize = attr.size()
 		
 		drawRect.origin.x = gutterWidth - drawSize.width - 4

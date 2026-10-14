@@ -15,14 +15,61 @@ import Foundation
 #endif
 
 extension SyntaxTextView: InnerTextViewDelegate {
-	
+
 	func didUpdateCursorFloatingState() {
-		
+
 		selectionDidChange()
-		
+
 	}
-	
+
+	func didSelectGutterLine(_ line: Int, lineRect: CGRect) -> Bool {
+
+		let diagnostics = textView.diagnostics(onLine: line)
+
+		guard !diagnostics.isEmpty else {
+			return false
+		}
+
+		var rect = convert(lineRect, from: textView)
+
+		#if os(macOS)
+		// Report with a top-left origin, matching iOS and SwiftUI.
+		if !isFlipped {
+			rect.origin.y = bounds.height - rect.maxY
+		}
+		#endif
+
+		delegate?.didSelectDiagnostics(self, diagnostics: diagnostics, line: line, lineRect: rect)
+
+		return true
+	}
+
 }
+
+#if os(iOS)
+
+extension SyntaxTextView: UIGestureRecognizerDelegate {
+
+	// Only claim taps on gutter cells that have diagnostics, so ordinary
+	// taps still reach the text view.
+	public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+		guard let hit = textView.line(at: touch.location(in: textView)) else {
+			return false
+		}
+		return !textView.diagnostics(onLine: hit.line).isEmpty
+	}
+
+	// Make the text view's own recognizers (caret placement, selection)
+	// wait for the gutter tap, so a tap on a diagnostic cell doesn't also
+	// move the caret and raise the keyboard. For touches we don't claim,
+	// the gutter tap fails immediately and nothing is delayed.
+	public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+		return true
+	}
+
+}
+
+#endif
 
 extension SyntaxTextView {
 
