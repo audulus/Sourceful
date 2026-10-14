@@ -25,6 +25,11 @@ public protocol SyntaxTextViewDelegate: AnyObject {
 
     func lexerForSource(_ source: String) -> Lexer
 
+    /// Called when the user clicks or taps the gutter beside a line that has
+    /// diagnostics. `lineRect` is that line's gutter cell in the syntax text
+    /// view's coordinate space, with a top-left origin on both platforms.
+    func didSelectDiagnostics(_ syntaxTextView: SyntaxTextView, diagnostics: [SourceDiagnostic], line: Int, lineRect: CGRect)
+
 }
 
 // Provide default empty implementations of methods that are optional.
@@ -34,6 +39,8 @@ public extension SyntaxTextViewDelegate {
     func didChangeSelectedRange(_ syntaxTextView: SyntaxTextView, selectedRange: NSRange) { }
 
     func textViewDidBeginEditing(_ syntaxTextView: SyntaxTextView) { }
+
+    func didSelectDiagnostics(_ syntaxTextView: SyntaxTextView, diagnostics: [SourceDiagnostic], line: Int, lineRect: CGRect) { }
 }
 
 struct ThemeInfo {
@@ -66,6 +73,38 @@ open class SyntaxTextView: _View {
     }
 
     var ignoreSelectionChange = false
+
+    /// Compiler messages to mark in the gutter. Lines are 1-based.
+    /// Only drawn when the theme shows line numbers.
+    ///
+    /// As the user edits, the view shifts these so they stay on the lines
+    /// they were reported for; the getter returns the shifted values. The
+    /// host should still replace them whenever it recompiles.
+    public var diagnostics: [SourceDiagnostic] {
+        get { textView.diagnostics }
+        set {
+            guard newValue != textView.diagnostics else { return }
+            textView.diagnostics = newValue
+            redrawGutter()
+        }
+    }
+
+    /// Color used for diagnostic markers.
+    public var diagnosticColor: Color {
+        get { textView.diagnosticColor }
+        set {
+            textView.diagnosticColor = newValue
+            redrawGutter()
+        }
+    }
+
+    private func redrawGutter() {
+        #if os(macOS)
+        wrapperView.setNeedsDisplay(wrapperView.bounds)
+        #else
+        textView.setNeedsDisplay()
+        #endif
+    }
 
     #if os(macOS)
 
@@ -228,10 +267,21 @@ open class SyntaxTextView: _View {
 
         }
 
+        let gutterTap = UITapGestureRecognizer(target: self, action: #selector(didTapGutter(_:)))
+        gutterTap.delegate = self
+        textView.addGestureRecognizer(gutterTap)
+
         #endif
 
         textView.innerDelegate = self
         textView.delegate = self
+
+        // Tracks edits so diagnostics follow their lines.
+        #if os(macOS)
+        textView.textStorage?.delegate = textView
+        #else
+        textView.textStorage.delegate = textView
+        #endif
 
         textView.text = ""
 
@@ -328,6 +378,13 @@ open class SyntaxTextView: _View {
 
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
         self.textView.setNeedsDisplay()
+    }
+
+    @objc private func didTapGutter(_ recognizer: UITapGestureRecognizer) {
+        guard let hit = textView.line(at: recognizer.location(in: textView)) else {
+            return
+        }
+        _ = didSelectGutterLine(hit.line, lineRect: hit.lineRect)
     }
 
     override open func layoutSubviews() {
